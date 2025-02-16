@@ -12,3 +12,8 @@ Smol Data Explorer aims to be one of the infinite possible answers to the questi
 ## So, what is it?
 
 In a nutshell, imagine giving an LLM workflow the seamless ability to interact with your data "hands-on": you specify a DB schema, and, if there is a DB in your agent's running environment that knows and uses that schema, your agent can translate plain English questions into executable queries that unlock more insights on your data!
+
+## How does it work?
+
+This first version is very simple:
+
