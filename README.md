@@ -17,3 +17,14 @@ In a nutshell, imagine giving an LLM workflow the seamless ability to interact w
 
 This first version is very simple:
 
+![ReAct Framework](images/agent-query.png)
+
+The agent has two tools at its disposal and, when coupled with a powerful, very directional system prompt, these 
+tools can be used to give an LLM a degree of "agency", where it can perform certain actions that traditional LLMs 
+wouldn't be able to do, such as, for example, execute a query.
+
+The first tool, "Schema Reader" actually leverages a pg_dump raw SQL file to let the LLM grasp a schema, and bring 
+it into context for the LLM.
+Then, based on the output of this first tool, the LLM will ReAct (reason and act) by invoking a second tool, "Query 
+Executor" that will execute the query, by running Python code, that "lives" in the same environment where the agent 
+is running and then, once the result set is brought into the context of the LLM, the final result will be displayed.
