@@ -40,5 +40,6 @@ For now, I am using one of the best open-source LLMs for tool calling, `mistral-
 - [ ] Evaluate long-context tasks 
 - [ ] Try different base models
 - [ ] Use a bigger/more complex schema
+- [ ] Add a "Schema contextualizer" tool to "slice" a big schema to drilldown on specific tables for a given query
 - [ ] "Inject" steps to better control output formats
 - [ ] Use with a front-end client 
