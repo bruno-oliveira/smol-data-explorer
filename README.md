@@ -34,3 +34,11 @@ is running and then, once the result set is brought into the context of the LLM,
 Yes, it does! In fact, only LLMs that are optimized for tool calling can be used and, among these, some rank higher than others, due to their "learned abilities" for maintaining context, having a large context window size, and their ability to follow instructions. This trifecta will greatly affect the quality of your agents.
 
 For now, I am using one of the best open-source LLMs for tool calling, `mistral-small` via ollama. You can read more [here](https://www.galileo.ai/blog/agent-leaderboard), thanks to the team from Galileo AI who put up an amazing LLM tool calling leaderboard on HuggingFace.
+
+### Roadmap
+
+- [ ] Evaluate long-context tasks 
+- [ ] Try different base models
+- [ ] Use a bigger/more complex schema
+- [ ] "Inject" steps to better control output formats
+- [ ] Use with a front-end client 
