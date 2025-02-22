@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 15.11 (Debian 15.11-1.pgdg120+1)
+-- Dumped from database version 15.12 (Debian 15.12-1.pgdg120+1)
 -- Dumped by pg_dump version 15.10 (Postgres.app)
 
 SET statement_timeout = 0;
@@ -15,6 +15,19 @@ SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
+
+--
+-- Name: action_status; Type: TYPE; Schema: public; Owner: admin
+--
+
+CREATE TYPE public.action_status AS ENUM (
+    'PENDING',
+    'PROCESSED',
+    'CANCELLED'
+);
+
+
+ALTER TYPE public.action_status OWNER TO admin;
 
 --
 -- Name: asset_class; Type: TYPE; Schema: public; Owner: admin
@@ -32,6 +45,36 @@ CREATE TYPE public.asset_class AS ENUM (
 ALTER TYPE public.asset_class OWNER TO admin;
 
 --
+-- Name: corporate_action_type; Type: TYPE; Schema: public; Owner: admin
+--
+
+CREATE TYPE public.corporate_action_type AS ENUM (
+    'SPLIT',
+    'REVERSE_SPLIT',
+    'DIVIDEND',
+    'MERGER',
+    'SPINOFF',
+    'RIGHTS_ISSUE'
+);
+
+
+ALTER TYPE public.corporate_action_type OWNER TO admin;
+
+--
+-- Name: rebalance_frequency; Type: TYPE; Schema: public; Owner: admin
+--
+
+CREATE TYPE public.rebalance_frequency AS ENUM (
+    'MONTHLY',
+    'QUARTERLY',
+    'SEMI_ANNUAL',
+    'ANNUAL'
+);
+
+
+ALTER TYPE public.rebalance_frequency OWNER TO admin;
+
+--
 -- Name: risk_rating; Type: TYPE; Schema: public; Owner: admin
 --
 
@@ -43,6 +86,20 @@ CREATE TYPE public.risk_rating AS ENUM (
 
 
 ALTER TYPE public.risk_rating OWNER TO admin;
+
+--
+-- Name: rule_type; Type: TYPE; Schema: public; Owner: admin
+--
+
+CREATE TYPE public.rule_type AS ENUM (
+    'CONCENTRATION',
+    'ASSET_CLASS',
+    'CURRENCY',
+    'CREDIT_RATING'
+);
+
+
+ALTER TYPE public.rule_type OWNER TO admin;
 
 --
 -- Name: transaction_type; Type: TYPE; Schema: public; Owner: admin
@@ -62,6 +119,90 @@ ALTER TYPE public.transaction_type OWNER TO admin;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: compliance_rules; Type: TABLE; Schema: public; Owner: admin
+--
+
+CREATE TABLE public.compliance_rules (
+    id integer NOT NULL,
+    portfolio_id integer,
+    rule_type public.rule_type NOT NULL,
+    threshold_value numeric(10,2) NOT NULL,
+    active boolean DEFAULT true,
+    description text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    last_checked_at timestamp with time zone
+);
+
+
+ALTER TABLE public.compliance_rules OWNER TO admin;
+
+--
+-- Name: compliance_rules_id_seq; Type: SEQUENCE; Schema: public; Owner: admin
+--
+
+CREATE SEQUENCE public.compliance_rules_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.compliance_rules_id_seq OWNER TO admin;
+
+--
+-- Name: compliance_rules_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: admin
+--
+
+ALTER SEQUENCE public.compliance_rules_id_seq OWNED BY public.compliance_rules.id;
+
+
+--
+-- Name: corporate_actions; Type: TABLE; Schema: public; Owner: admin
+--
+
+CREATE TABLE public.corporate_actions (
+    id integer NOT NULL,
+    instrument_id integer,
+    action_type public.corporate_action_type NOT NULL,
+    announcement_date timestamp with time zone NOT NULL,
+    record_date timestamp with time zone,
+    payment_date timestamp with time zone,
+    ratio numeric(10,4),
+    amount numeric(10,4),
+    currency_code character(3),
+    status public.action_status DEFAULT 'PENDING'::public.action_status,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    processed_at timestamp with time zone
+);
+
+
+ALTER TABLE public.corporate_actions OWNER TO admin;
+
+--
+-- Name: corporate_actions_id_seq; Type: SEQUENCE; Schema: public; Owner: admin
+--
+
+CREATE SEQUENCE public.corporate_actions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.corporate_actions_id_seq OWNER TO admin;
+
+--
+-- Name: corporate_actions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: admin
+--
+
+ALTER SEQUENCE public.corporate_actions_id_seq OWNED BY public.corporate_actions.id;
+
 
 --
 -- Name: financial_institutions; Type: TABLE; Schema: public; Owner: admin
@@ -226,6 +367,47 @@ ALTER SEQUENCE public.portfolios_id_seq OWNED BY public.portfolios.id;
 
 
 --
+-- Name: rebalancing_schedules; Type: TABLE; Schema: public; Owner: admin
+--
+
+CREATE TABLE public.rebalancing_schedules (
+    id integer NOT NULL,
+    portfolio_id integer,
+    target_allocation jsonb NOT NULL,
+    tolerance_band numeric(5,2) NOT NULL,
+    frequency public.rebalance_frequency NOT NULL,
+    last_rebalance_date timestamp with time zone,
+    next_rebalance_date timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT valid_tolerance CHECK (((tolerance_band >= (0)::numeric) AND (tolerance_band <= (100)::numeric)))
+);
+
+
+ALTER TABLE public.rebalancing_schedules OWNER TO admin;
+
+--
+-- Name: rebalancing_schedules_id_seq; Type: SEQUENCE; Schema: public; Owner: admin
+--
+
+CREATE SEQUENCE public.rebalancing_schedules_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.rebalancing_schedules_id_seq OWNER TO admin;
+
+--
+-- Name: rebalancing_schedules_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: admin
+--
+
+ALTER SEQUENCE public.rebalancing_schedules_id_seq OWNED BY public.rebalancing_schedules.id;
+
+
+--
 -- Name: transactions; Type: TABLE; Schema: public; Owner: admin
 --
 
@@ -266,6 +448,20 @@ ALTER SEQUENCE public.transactions_id_seq OWNED BY public.transactions.id;
 
 
 --
+-- Name: compliance_rules id; Type: DEFAULT; Schema: public; Owner: admin
+--
+
+ALTER TABLE ONLY public.compliance_rules ALTER COLUMN id SET DEFAULT nextval('public.compliance_rules_id_seq'::regclass);
+
+
+--
+-- Name: corporate_actions id; Type: DEFAULT; Schema: public; Owner: admin
+--
+
+ALTER TABLE ONLY public.corporate_actions ALTER COLUMN id SET DEFAULT nextval('public.corporate_actions_id_seq'::regclass);
+
+
+--
 -- Name: financial_institutions id; Type: DEFAULT; Schema: public; Owner: admin
 --
 
@@ -287,10 +483,33 @@ ALTER TABLE ONLY public.portfolios ALTER COLUMN id SET DEFAULT nextval('public.p
 
 
 --
+-- Name: rebalancing_schedules id; Type: DEFAULT; Schema: public; Owner: admin
+--
+
+ALTER TABLE ONLY public.rebalancing_schedules ALTER COLUMN id SET DEFAULT nextval('public.rebalancing_schedules_id_seq'::regclass);
+
+
+--
 -- Name: transactions id; Type: DEFAULT; Schema: public; Owner: admin
 --
 
 ALTER TABLE ONLY public.transactions ALTER COLUMN id SET DEFAULT nextval('public.transactions_id_seq'::regclass);
+
+
+--
+-- Name: compliance_rules compliance_rules_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
+--
+
+ALTER TABLE ONLY public.compliance_rules
+    ADD CONSTRAINT compliance_rules_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: corporate_actions corporate_actions_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
+--
+
+ALTER TABLE ONLY public.corporate_actions
+    ADD CONSTRAINT corporate_actions_pkey PRIMARY KEY (id);
 
 
 --
@@ -350,11 +569,54 @@ ALTER TABLE ONLY public.portfolios
 
 
 --
+-- Name: rebalancing_schedules rebalancing_schedules_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
+--
+
+ALTER TABLE ONLY public.rebalancing_schedules
+    ADD CONSTRAINT rebalancing_schedules_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: transactions transactions_pkey; Type: CONSTRAINT; Schema: public; Owner: admin
 --
 
 ALTER TABLE ONLY public.transactions
     ADD CONSTRAINT transactions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_compliance_active; Type: INDEX; Schema: public; Owner: admin
+--
+
+CREATE INDEX idx_compliance_active ON public.compliance_rules USING btree (active);
+
+
+--
+-- Name: idx_compliance_portfolio; Type: INDEX; Schema: public; Owner: admin
+--
+
+CREATE INDEX idx_compliance_portfolio ON public.compliance_rules USING btree (portfolio_id);
+
+
+--
+-- Name: idx_corporate_actions_dates; Type: INDEX; Schema: public; Owner: admin
+--
+
+CREATE INDEX idx_corporate_actions_dates ON public.corporate_actions USING btree (record_date, payment_date);
+
+
+--
+-- Name: idx_corporate_actions_instrument; Type: INDEX; Schema: public; Owner: admin
+--
+
+CREATE INDEX idx_corporate_actions_instrument ON public.corporate_actions USING btree (instrument_id);
+
+
+--
+-- Name: idx_corporate_actions_status; Type: INDEX; Schema: public; Owner: admin
+--
+
+CREATE INDEX idx_corporate_actions_status ON public.corporate_actions USING btree (status);
 
 
 --
@@ -372,6 +634,20 @@ CREATE INDEX idx_performance_date ON public.performance_metrics USING btree (cal
 
 
 --
+-- Name: idx_rebalancing_next_date; Type: INDEX; Schema: public; Owner: admin
+--
+
+CREATE INDEX idx_rebalancing_next_date ON public.rebalancing_schedules USING btree (next_rebalance_date);
+
+
+--
+-- Name: idx_rebalancing_portfolio; Type: INDEX; Schema: public; Owner: admin
+--
+
+CREATE INDEX idx_rebalancing_portfolio ON public.rebalancing_schedules USING btree (portfolio_id);
+
+
+--
 -- Name: idx_transactions_date; Type: INDEX; Schema: public; Owner: admin
 --
 
@@ -383,6 +659,22 @@ CREATE INDEX idx_transactions_date ON public.transactions USING btree (transacti
 --
 
 CREATE INDEX idx_transactions_portfolio ON public.transactions USING btree (portfolio_id);
+
+
+--
+-- Name: compliance_rules compliance_rules_portfolio_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: admin
+--
+
+ALTER TABLE ONLY public.compliance_rules
+    ADD CONSTRAINT compliance_rules_portfolio_id_fkey FOREIGN KEY (portfolio_id) REFERENCES public.portfolios(id);
+
+
+--
+-- Name: corporate_actions corporate_actions_instrument_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: admin
+--
+
+ALTER TABLE ONLY public.corporate_actions
+    ADD CONSTRAINT corporate_actions_instrument_id_fkey FOREIGN KEY (instrument_id) REFERENCES public.instruments(id);
 
 
 --
@@ -431,6 +723,14 @@ ALTER TABLE ONLY public.portfolio_holdings
 
 ALTER TABLE ONLY public.portfolios
     ADD CONSTRAINT portfolios_institution_id_fkey FOREIGN KEY (institution_id) REFERENCES public.financial_institutions(id);
+
+
+--
+-- Name: rebalancing_schedules rebalancing_schedules_portfolio_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: admin
+--
+
+ALTER TABLE ONLY public.rebalancing_schedules
+    ADD CONSTRAINT rebalancing_schedules_portfolio_id_fkey FOREIGN KEY (portfolio_id) REFERENCES public.portfolios(id);
 
 
 --

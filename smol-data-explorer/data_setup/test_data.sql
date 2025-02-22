@@ -56,3 +56,42 @@ INSERT INTO performance_metrics (portfolio_id, calculation_date, total_value, da
                                                                                                                           (1, '2024-02-14', 185250.00, 0.85, 5.25, '{"sharpe_ratio": 1.25, "volatility": 0.12, "beta": 0.85}'),
                                                                                                                           (2, '2024-02-14', 275500.00, 1.25, 8.75, '{"sharpe_ratio": 1.85, "volatility": 0.22, "beta": 1.35}'),
                                                                                                                           (3, '2024-02-14', 225750.00, 0.95, 6.50, '{"sharpe_ratio": 1.45, "volatility": 0.15, "beta": 0.95}');
+
+-- Insert Compliance Rules
+INSERT INTO compliance_rules (portfolio_id, rule_type, threshold_value, description) VALUES
+                                                                                         (1, 'CONCENTRATION', 25.00, 'No single holding can exceed 25% of portfolio value'),
+                                                                                         (1, 'ASSET_CLASS', 40.00, 'Maximum Fixed Income allocation for Conservative Growth'),
+                                                                                         (2, 'CONCENTRATION', 35.00, 'Higher concentration limit for Aggressive Growth'),
+                                                                                         (3, 'CURRENCY', 80.00, 'Minimum USD exposure for Balanced Income'),
+                                                                                         (2, 'CREDIT_RATING', 15.00, 'Maximum exposure to below-investment-grade bonds');
+
+-- Insert Rebalancing Schedules
+INSERT INTO rebalancing_schedules (
+    portfolio_id,
+    target_allocation,
+    tolerance_band,
+    frequency,
+    last_rebalance_date,
+    next_rebalance_date
+) VALUES
+      (1, '{"EQUITY": 30, "FIXED_INCOME": 40, "COMMODITY": 10, "CASH": 20}', 5.00, 'QUARTERLY', '2024-01-15 00:00:00+00', '2024-04-15 00:00:00+00'),
+      (2, '{"EQUITY": 70, "COMMODITY": 20, "FIXED_INCOME": 10}', 7.50, 'MONTHLY', '2024-02-01 00:00:00+00', '2024-03-01 00:00:00+00'),
+      (3, '{"EQUITY": 50, "REAL_ESTATE": 30, "FIXED_INCOME": 20}', 5.00, 'SEMI_ANNUAL', '2024-01-20 00:00:00+00', '2024-07-20 00:00:00+00');
+
+-- Insert Corporate Actions
+INSERT INTO corporate_actions (
+    instrument_id,
+    action_type,
+    announcement_date,
+    record_date,
+    payment_date,
+    ratio,
+    amount,
+    currency_code,
+    status
+) VALUES
+      (1, 'DIVIDEND', '2024-01-15 00:00:00+00', '2024-02-01 00:00:00+00', '2024-02-15 00:00:00+00', NULL, 0.75, 'USD', 'PROCESSED'),
+      (2, 'DIVIDEND', '2024-01-20 00:00:00+00', '2024-02-05 00:00:00+00', '2024-02-20 00:00:00+00', NULL, 0.68, 'USD', 'PENDING'),
+      (1, 'SPLIT', '2024-02-10 00:00:00+00', '2024-03-01 00:00:00+00', '2024-03-02 00:00:00+00', 4.0000, NULL, 'USD', 'PENDING'),
+      (5, 'RIGHTS_ISSUE', '2024-02-01 00:00:00+00', '2024-02-15 00:00:00+00', '2024-02-28 00:00:00+00', 0.1000, 85.00, 'USD', 'PENDING'),
+      (3, 'DIVIDEND', '2024-02-05 00:00:00+00', '2024-02-20 00:00:00+00', '2024-03-05 00:00:00+00', NULL, 1.25, 'USD', 'PENDING');
