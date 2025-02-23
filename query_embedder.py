@@ -39,7 +39,7 @@ def retrieve_query_examples_for_rag():
             cursor.close()
         if conn:
             conn.close()
-            
+
     return questions_to_embed
 
 def calculate_cosine_similarities(

@@ -1,6 +1,7 @@
 import os
 
 from litellm import completion
+from litellm.types.utils import ModelResponse
 
 from smolagents import LiteLLMModel
 
@@ -15,21 +16,24 @@ model = LiteLLMModel(
     # https://huggingface.co/spaces/NyxKrage/LLM-Model-VRAM-Calculator to calculate how much VRAM this will need for the selected model.
 )
 
-query_examples = get_embedding_for_queries()
-user_question = get_embedding_for("Listing of dividend payments received in last year?")
-similar_queries = calculate_cosine_similarities(user_question,
-                                                list(map(lambda x: (x[1],x[2]) ,query_examples)))
-
-similar_queries_ = "Listing of dividend payments received in last year? Context:" + "\n\n".join(
-    list(map(lambda x: x[0], similar_queries[0:3])))
+def generate_response_for(question: str) -> ModelResponse:
+    query_examples = get_embedding_for_queries()
+    user_question = get_embedding_for(question)
+    similar_queries = calculate_cosine_similarities(user_question,
+                                                    list(map(lambda x: (x[1],x[2]) ,query_examples)))
 
 
-response = completion(
-    model=model.model_id,
-    messages=[{"content": "Output only a SQL query to answer the user question, based on the examples given as "
-                          "context.", "role":"system"},
-              { "content": similar_queries_, "role": "user"}],
-    stream=False,
-)
+    similar_queries_ = (f"{question} Context:" +
+                        "\n\n".join(list(map(lambda x: x[0], similar_queries[0:3]))))
 
-print(response)
+
+    response = completion(
+        model=model.model_id,
+        messages=[{"content": "Output only a SQL query to answer the user question, based on the examples given as "
+                              "context.", "role":"system"},
+                  { "content": similar_queries_, "role": "user"}],
+        stream=False,
+    )
+    return response
+
+print(generate_response_for("What are the institutions with the most transactions in 2022?"))
