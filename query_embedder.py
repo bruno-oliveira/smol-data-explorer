@@ -1,13 +1,10 @@
 import functools
-import os
 from typing import Tuple, List
 
 import numpy as np
 import ollama
 import psycopg2
 
-from litellm import embedding, cache
-from smolagents import LiteLLMModel
 
 
 def embed(questions: list[str]):
@@ -15,8 +12,6 @@ def embed(questions: list[str]):
 
 
 def retrieve_query_examples_for_rag():
-    #global questions_to_embed
-    # Database connection parameters
     db_params = {
         'dbname': 'rag_db',
         'user': 'admin',
@@ -25,22 +20,14 @@ def retrieve_query_examples_for_rag():
     }
     questions_to_embed = []
     try:
-        # Establish the connection
         conn = psycopg2.connect(**db_params)
-
         # Create a cursor object
         cursor = conn.cursor()
 
-        # Define the query
         query = "SELECT * FROM query_examples;"
-
-        # Execute the query
         cursor.execute(query)
-
-        # Fetch all rows from the executed query
         rows = cursor.fetchall()
 
-        # Print the rows
         for row in rows:
             questions_to_embed.append(row)
 
@@ -48,11 +35,11 @@ def retrieve_query_examples_for_rag():
         print(f"Error: {e}")
 
     finally:
-        # Close the cursor and connection
         if cursor:
             cursor.close()
         if conn:
             conn.close()
+            
     return questions_to_embed
 
 def calculate_cosine_similarities(
@@ -95,27 +82,25 @@ def calculate_cosine_similarities(
     # Sort by similarity in descending order
     sorted_result = sorted(result, key=lambda x: x[2], reverse=True)
 
-    print(sorted_result[0])
     return sorted_result
 
 @functools.cache
 def get_query_example_embeddings() -> dict[str,list[float]]:
     print("Computing embeddings for query examples")
-    return embed(list(map(lambda x: x[0], questions_to_embed)))
+    return embed(list(map(lambda x: x[0], embedded_example_queries)))
 
 @functools.cache
 def get_embedding_for(question:str) -> list[float]:
-    print("For single question")
     return embed([question])['embeddings'][0]
 
 @functools.cache
 def get_embedding_for_queries() -> List[Tuple[str, str, List[float]]]:
 
-    embeddings_values = embed(list(map(lambda x: x[0], questions_to_embed))).embeddings
+    embeddings_values = embed(list(map(lambda x: x[0], embedded_example_queries))).embeddings
     answer = []
-    for i in range(len(questions_to_embed)):
-        answer.append([questions_to_embed[i][0],questions_to_embed[i][1], embeddings_values[i]])
+    for i in range(len(embedded_example_queries)):
+        answer.append((embedded_example_queries[i][0], embedded_example_queries[i][1], embeddings_values[i]))
     return answer
 
 if name:="__main__":
-    questions_to_embed = retrieve_query_examples_for_rag()
+    embedded_example_queries = retrieve_query_examples_for_rag()
