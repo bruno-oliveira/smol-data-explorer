@@ -15,7 +15,7 @@ def embed(questions: list[str]):
 
 
 def retrieve_query_examples_for_rag():
-    global questions_to_embed
+    #global questions_to_embed
     # Database connection parameters
     db_params = {
         'dbname': 'rag_db',
@@ -42,7 +42,7 @@ def retrieve_query_examples_for_rag():
 
         # Print the rows
         for row in rows:
-            questions_to_embed.append(row[0])
+            questions_to_embed.append(row)
 
     except psycopg2.Error as e:
         print(f"Error: {e}")
@@ -53,6 +53,7 @@ def retrieve_query_examples_for_rag():
             cursor.close()
         if conn:
             conn.close()
+    return questions_to_embed
 
 def calculate_cosine_similarities(
         question_vector: List[float],
@@ -94,12 +95,13 @@ def calculate_cosine_similarities(
     # Sort by similarity in descending order
     sorted_result = sorted(result, key=lambda x: x[2], reverse=True)
 
+    print(sorted_result[0])
     return sorted_result
 
 @functools.cache
 def get_query_example_embeddings() -> dict[str,list[float]]:
     print("Computing embeddings for query examples")
-    return embed(questions_to_embed)
+    return embed(list(map(lambda x: x[0], questions_to_embed)))
 
 @functools.cache
 def get_embedding_for(question:str) -> list[float]:
@@ -107,13 +109,13 @@ def get_embedding_for(question:str) -> list[float]:
     return embed([question])['embeddings'][0]
 
 @functools.cache
-def get_embedding_for_queries() -> List[Tuple[str, List[float]]]:
+def get_embedding_for_queries() -> List[Tuple[str, str, List[float]]]:
 
-    embeddings_values = embed(questions_to_embed).embeddings
+    embeddings_values = embed(list(map(lambda x: x[0], questions_to_embed))).embeddings
     answer = []
     for i in range(len(questions_to_embed)):
-        answer.append([questions_to_embed[i],embeddings_values[i]])
+        answer.append([questions_to_embed[i][0],questions_to_embed[i][1], embeddings_values[i]])
     return answer
 
 if name:="__main__":
-    retrieve_query_examples_for_rag()
+    questions_to_embed = retrieve_query_examples_for_rag()

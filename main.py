@@ -28,14 +28,24 @@ def my_custom_tool(name: str) -> str:
 
 
 
-response = completion(
-    model=model.model_id,
-    messages=[{ "content": "Hello, what model are you?","role": "user"}],
-    stream=False,
-)
+
 
 
 query_examples = get_embedding_for_queries()
 user_question = query_embedder.get_embedding_for("Listing of dividend payments received in last year?")
+similar_queries = query_embedder.calculate_cosine_similarities(user_question, list(map(lambda x: [x[1],x[2]] ,
+                                                                                   query_examples)))
 
-print(query_embedder.calculate_cosine_similarities(user_question, query_examples))
+similar_queries_ = "Listing of dividend payments received in last year? Context:" + "\n\n".join(
+    list(map(lambda x: x[0], similar_queries[0:3])))
+
+
+response = completion(
+    model=model.model_id,
+    messages=[{"content": "Output only a SQL query to answer the user question, based on the examples given as "
+                          "context.", "role":"system"},
+              { "content": similar_queries_, "role": "user"}],
+    stream=False,
+)
+
+print(response)
