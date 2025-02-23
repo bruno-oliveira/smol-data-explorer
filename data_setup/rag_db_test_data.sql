@@ -492,6 +492,185 @@ VALUES ('What is the current market value of each portfolio, including the portf
     GROUP BY fi.name
     ORDER BY total_aum DESC;'
 ),
+   (
+    'Show the monthly performance of each portfolio in 2024, including number of trades and trading value, ordered by YTD return',
+    'WITH monthly_metrics AS (
+    SELECT
+        p.name as portfolio_name,
+        DATE_TRUNC(''month'', pm.calculation_date) as month,
+        AVG(pm.daily_return) as avg_monthly_return,
+        MAX(pm.ytd_return) as ytd_return,
+        COUNT(DISTINCT t.id) as number_of_trades,
+        SUM(t.quantity * t.price) as total_trading_value
+    FROM portfolios p
+    JOIN performance_metrics pm ON p.id = pm.portfolio_id
+    LEFT JOIN transactions t ON p.id = t.portfolio_id
+        AND DATE_TRUNC(''month'', t.transaction_date) = DATE_TRUNC(''month'', pm.calculation_date)
+    WHERE EXTRACT(YEAR FROM pm.calculation_date) = 2024
+    GROUP BY p.name, DATE_TRUNC(''month'', pm.calculation_date)
+)
+SELECT
+    portfolio_name,
+    month,
+    avg_monthly_return::DECIMAL(5,2) as monthly_return_pct,
+    ytd_return::DECIMAL(5,2) as ytd_return_pct,
+    number_of_trades,
+    total_trading_value::DECIMAL(10,2) as total_trading_value
+FROM monthly_metrics
+ORDER BY month, ytd_return DESC;'
+),
+(
+    'Show each instrument''s monthly price change, total holdings across portfolios, and the risk profile of portfolios holding it',
+    'WITH price_changes AS (
+    SELECT
+        instrument_id,
+        first_value(closing_price) OVER (PARTITION BY instrument_id ORDER BY price_date DESC) as latest_price,
+        first_value(closing_price) OVER (PARTITION BY instrument_id ORDER BY price_date ASC) as month_ago_price
+    FROM market_prices
+    WHERE price_date >= CURRENT_DATE - INTERVAL ''1 month''
+)
+SELECT
+    i.symbol,
+    i.name,
+    i.asset_class,
+    pc.latest_price::DECIMAL(10,2) as current_price,
+    pc.month_ago_price::DECIMAL(10,2) as price_month_ago,
+    ((pc.latest_price - pc.month_ago_price) / pc.month_ago_price * 100)::DECIMAL(5,2) as price_change_pct,
+    SUM(ph.quantity) as total_holdings,
+    array_agg(DISTINCT p.risk_profile) as portfolio_risk_profiles,
+    COUNT(DISTINCT p.id) as number_of_portfolios_holding
+FROM instruments i
+JOIN price_changes pc ON i.id = pc.instrument_id
+LEFT JOIN portfolio_holdings ph ON i.id = ph.instrument_id
+LEFT JOIN portfolios p ON ph.portfolio_id = p.id
+GROUP BY
+    i.symbol,
+    i.name,
+    i.asset_class,
+    pc.latest_price,
+    pc.month_ago_price
+ORDER BY price_change_pct DESC;'
+),
+(
+    'For portfolios that experienced compliance breaches in the last quarter, analyze their risk-adjusted returns compared to similar portfolios, breaking down impact by asset class and transaction costs',
+    'WITH breach_portfolios AS (
+    SELECT DISTINCT
+        p.id as portfolio_id,
+        p.name as portfolio_name,
+        p.risk_profile,
+        COUNT(DISTINCT cr.rule_type) as breach_types,
+        MIN(t.transaction_date) as first_breach_date
+    FROM portfolios p
+    JOIN portfolio_holdings ph ON p.id = ph.portfolio_id
+    JOIN instruments i ON ph.instrument_id = i.id
+    JOIN market_prices mp ON i.id = mp.instrument_id
+    JOIN compliance_rules cr ON p.id = cr.portfolio_id
+    JOIN transactions t ON p.id = t.portfolio_id
+    WHERE
+        (ph.quantity * mp.closing_price) / SUM(ph.quantity * mp.closing_price) OVER (PARTITION BY p.id) * 100 > cr.threshold_value
+        AND t.transaction_date >= CURRENT_DATE - INTERVAL ''3 months''
+        AND cr.active = true
+    GROUP BY p.id, p.name, p.risk_profile
+),
+portfolio_metrics AS (
+    SELECT
+        bp.portfolio_name,
+        i.asset_class,
+        SUM(t.quantity * t.price) as trading_volume,
+        AVG(pm.daily_return) as avg_daily_return,
+        STDDEV(pm.daily_return) as return_volatility,
+        (pm.risk_metrics->>''sharpe_ratio'')::numeric as sharpe_ratio,
+        bp.breach_types,
+        ROW_NUMBER() OVER (PARTITION BY i.asset_class ORDER BY AVG(pm.daily_return) / NULLIF(STDDEV(pm.daily_return), 0) DESC) as asset_class_rank
+    FROM breach_portfolios bp
+    JOIN transactions t ON bp.portfolio_id = t.portfolio_id
+    JOIN instruments i ON t.instrument_id = i.id
+    JOIN performance_metrics pm ON bp.portfolio_id = pm.portfolio_id
+    WHERE t.transaction_date >= bp.first_breach_date
+    GROUP BY bp.portfolio_name, i.asset_class, pm.risk_metrics->>''sharpe_ratio'', bp.breach_types
+)
+SELECT
+    pm.portfolio_name,
+    pm.asset_class,
+    pm.trading_volume::DECIMAL(15,2) as trading_volume,
+    (pm.avg_daily_return * 252 * 100)::DECIMAL(5,2) as annualized_return_pct,
+    (pm.return_volatility * SQRT(252) * 100)::DECIMAL(5,2) as annualized_volatility_pct,
+    pm.sharpe_ratio::DECIMAL(4,2) as sharpe_ratio,
+    pm.breach_types,
+    pm.asset_class_rank,
+    CASE
+        WHEN pm.asset_class_rank = 1 THEN ''Top Performer''
+        WHEN pm.asset_class_rank <= 3 THEN ''Above Average''
+        ELSE ''Below Average''
+    END as performance_category
+FROM portfolio_metrics pm
+ORDER BY pm.asset_class, pm.asset_class_rank;'
+),
+(
+    'Generate a comprehensive risk report showing portfolio correlations, tail risk events, and concentration metrics across different market conditions in the past quarter',
+    'WITH daily_returns AS (
+    SELECT
+        p.id as portfolio_id,
+        p.name as portfolio_name,
+        p.risk_profile,
+        pm.calculation_date,
+        pm.daily_return,
+        AVG(pm.daily_return) OVER (PARTITION BY p.id ORDER BY pm.calculation_date ROWS BETWEEN 20 PRECEDING AND CURRENT ROW) as moving_avg_return,
+        STDDEV(pm.daily_return) OVER (PARTITION BY p.id ORDER BY pm.calculation_date ROWS BETWEEN 20 PRECEDING AND CURRENT ROW) as moving_volatility
+    FROM portfolios p
+    JOIN performance_metrics pm ON p.id = pm.portfolio_id
+    WHERE pm.calculation_date >= CURRENT_DATE - INTERVAL ''3 months''
+),
+market_conditions AS (
+    SELECT
+        dr.calculation_date,
+        CASE
+            WHEN AVG(dr.daily_return) < -2 * AVG(dr.moving_volatility) THEN ''Stress''
+            WHEN AVG(dr.daily_return) < -1 * AVG(dr.moving_volatility) THEN ''Downturn''
+            WHEN AVG(dr.daily_return) > AVG(dr.moving_volatility) THEN ''Upturn''
+            ELSE ''Normal''
+        END as market_condition
+    FROM daily_returns dr
+    GROUP BY dr.calculation_date
+),
+portfolio_exposures AS (
+    SELECT
+        p.id as portfolio_id,
+        p.name as portfolio_name,
+        mc.market_condition,
+        i.asset_class,
+        SUM(ph.quantity * mp.closing_price) / SUM(SUM(ph.quantity * mp.closing_price)) OVER (PARTITION BY p.id, mc.market_condition) * 100 as allocation_pct
+    FROM portfolios p
+    JOIN portfolio_holdings ph ON p.id = ph.portfolio_id
+    JOIN instruments i ON ph.instrument_id = i.id
+    JOIN market_prices mp ON i.id = mp.instrument_id
+    JOIN market_conditions mc ON mp.price_date = mc.calculation_date
+    GROUP BY p.id, p.name, mc.market_condition, i.asset_class
+)
+SELECT
+    pe.portfolio_name,
+    pe.market_condition,
+    pe.asset_class,
+    pe.allocation_pct::DECIMAL(5,2) as allocation_pct,
+    AVG(dr.daily_return * 100)::DECIMAL(5,2) as avg_daily_return_pct,
+    MAX(dr.daily_return * 100)::DECIMAL(5,2) as max_daily_return_pct,
+    MIN(dr.daily_return * 100)::DECIMAL(5,2) as min_daily_return_pct,
+    CORR(dr.daily_return, dr.moving_avg_return)::DECIMAL(4,2) as return_autocorrelation,
+    COUNT(*) as days_in_condition
+FROM portfolio_exposures pe
+JOIN daily_returns dr ON pe.portfolio_id = dr.portfolio_id
+JOIN market_conditions mc ON dr.calculation_date = mc.calculation_date
+    AND pe.market_condition = mc.market_condition
+GROUP BY
+    pe.portfolio_name,
+    pe.market_condition,
+    pe.asset_class,
+    pe.allocation_pct
+ORDER BY
+    pe.portfolio_name,
+    pe.market_condition,
+    pe.allocation_pct DESC;'
+),
 (
     'Show recent activity summary across all portfolios',
     'SELECT

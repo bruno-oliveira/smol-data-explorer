@@ -36,4 +36,4 @@ def generate_response_for(question: str) -> ModelResponse:
     )
     return response
 
-print(generate_response_for("What are the institutions with the most transactions in 2022?"))
+print(generate_response_for("For each portfolio, find the top 3 instruments by trading volume in the last month and compare their average purchase price versus their current market price. Include the total realized gain/loss from all closed positions in these instruments."))
