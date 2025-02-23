@@ -29,6 +29,8 @@ Then, based on the output of this first tool, the LLM will ReAct (reason and act
 Executor" that will execute the query, by running Python code, that "lives" in the same environment where the agent 
 is running and then, once the result set is brought into the context of the LLM, the final result will be displayed.
 
+Read about the next iteration of the architecture in [here](ARCHITECTURE_ITERATION_2.md).
+
 ## Does the base LLM matter?
 
 Yes, it does! In fact, only LLMs that are optimized for tool calling can be used and, among these, some rank higher than others, due to their "learned abilities" for maintaining context, having a large context window size, and their ability to follow instructions. This trifecta will greatly affect the quality of your agents.
